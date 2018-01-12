@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <thread>
+#include <sstream>
 
 /* pcl library */
 #include <pcl/ModelCoefficients.h>
@@ -43,6 +44,7 @@ class CSCSegmentator : public Segmentator{
 	double wtreshanglesqr = (0.29289 * 0.29289) + (0.70711 * 0.70711); /* 45 degrees difference between vectors squared */
 	double wtresh = lin_rbf(wtreshanglesqr, rbf_param);
 	static bool sortfunct(std::pair< double,int32_t > p1, std::pair< double,int32_t > p2){p1.first < p2.first;}
+	pcl::PointCloud<pcl::PointXYZL> finalCLD;
 	public:
 	CSCSegmentator() : Segmentator(){
 		
@@ -118,28 +120,13 @@ class CSCSegmentator : public Segmentator{
 						break;
 					}
 				}
-				cout << "before cut" << endl;
 				std::pair<int,int> cut = bestCut(SG, es.eigenvectors().block(0, cnt, es.eigenvectors().rows(), std::min(cnt+5, (int)es.eigenvectors().cols() - cnt)), relabelled, relabelledT, edgeWeight);				
 
-				std::vector< std::pair<double, double> > data;
 
-				pcl::visualization::PCLPlotter *plotter = new pcl::visualization::PCLPlotter ("My Plotter");
 
-				std::vector< std::vector<double> > dt;
-				cnt = cut.first;
-				EigenToStd(es.eigenvectors().col(cnt), dt);
-				sort(dt[0].begin(), dt[0].end());
+				//cout << es.eigenvectors().coeffRef(cut.second, cut.first) << " split" << endl;
 
-				for(int h = 0; h < dt[0].size(); h++){
-					data.push_back(std::pair<double,double>(h,dt[0][h]));
-				}
-
-				plotter->addPlotData (data,"cos");
-				plotter->plot();
-
-				cout << es.eigenvectors().coeffRef(cut.second, cut.first) << " split" << endl;
-
-				cout << "cututility: " << CutUtility(SG, cut, relabelled, es.eigenvectors(), edgeWeight) << endl;
+				//cout << "cututility: " << CutUtility(SG, cut, relabelled, es.eigenvectors(), edgeWeight) << endl;
 				
 				if(CutUtility(SG, cut, relabelled, es.eigenvectors(), edgeWeight) > 0.0){
 					std::pair< std::multimap<uint32_t,uint32_t>, std::multimap<uint32_t,uint32_t> > prCC = cutGraph(SG, cut, es.eigenvectors(), relabelled, relabelledT);
@@ -152,12 +139,12 @@ class CSCSegmentator : public Segmentator{
 						Q.push_back(prCC.second);
 					}
 
-					cout << "pushed A" << endl;
+					//cout << "pushed A" << endl;
 					i++;
 				} else {
 					if(i > 0){
 						Q.push_back(SG);
-						cout << "pushed Q" << endl;
+						//cout << "pushed Q" << endl;
 					}
 				}
 
@@ -165,7 +152,7 @@ class CSCSegmentator : public Segmentator{
 			}
 			if(i == 0){
 				C.push_back(S);
-				cout << "pushed C" << endl;
+				//cout << "pushed C" << endl;
 			}
 
 			Q.pop_front();
@@ -179,7 +166,7 @@ class CSCSegmentator : public Segmentator{
 		std::multimap<uint32_t,uint32_t> C2;
 		std::vector<uint32_t> idx1, idx2;
 		for(uint32_t i = 0; i < (uint32_t)eigenvecs.rows(); i++){
-				if(eigenvecs.coeffRef(i, cut.first) < eigenvecs.coeffRef(cut.second, cut.first)){
+				if(eigenvecs.coeffRef(i, cut.first) < eigenvecs.coeffRef(cut.second, cut.first)+DELTA_ERROR){
 					idx1.push_back(i);	
 				} else {
 					idx2.push_back(i);
@@ -289,37 +276,7 @@ class CSCSegmentator : public Segmentator{
 		double minimprob = std::numeric_limits<double>::max();
 		std::multimap<uint32_t, uint32_t>::iterator MMit;
 		std::pair< std::multimap<uint32_t, uint32_t>::iterator, std::multimap<uint32_t, uint32_t>::iterator > pos;
-		/* evaluate utility function */
-		/*for(int k = 0; k < rsrt.size(); k++){
-			if(!filter[rsrt[k].first])
-				continue;
-			double inC = 0.0;
-			double outC = 0.0;
-			for(int a = 0; a <= k; a++){
-				for(int b = 0; b <= k; b++){
-					if(a != b && isInMultiMap(C, rsrt[a].first, rsrt[b].first)){
-						inC += edgeWeight.coeffRef(rsrt[a].first, rsrt[b].first);
-					}
-				}	
-			}
-			for(int a = k+1; a < rsrt.size(); a++){
-				for(int b = k+1; b < rsrt.size(); b++){
-					if(a != b && isInMultiMap(C, rsrt[a].first, rsrt[b].first)){
-						outC += edgeWeight.coeffRef(rsrt[a].first, rsrt[b].first);
-					}
-				}	
-			}*/
-			
-			/* 2 instead of 1 because we have counted them twice */
-			/*double objectC = 2/inC + 2/outC;
 
-			double sc = signedCut(k, rsrt, edgeWeight, relabelledT, C)*objectC;
-
-			if(sc < minimprob){
-				minimprob = sc;
-				idxx = k;
-			}
-		}*/
 
 		return std::pair<int,int>(cuti, rsrt[cutv].first);
 	}
@@ -424,7 +381,7 @@ class CSCSegmentator : public Segmentator{
 						edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]) = lin_rbf(normal_distance_sqr(pn1, pn2), rbf_param);
 					}
 
-					if(cannot_link(edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]), 0.3)){
+					if(cannot_link(edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]), wtresh)){
 						
 						edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]) = -1;
 					}
@@ -608,8 +565,7 @@ class CSCSegmentator : public Segmentator{
 		cout << "Found " << supervoxel_clusters.size() << " supervoxels" << endl;
 		//super.refineSupervoxels(2, supervoxel_clusters);
 
-		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
-		viewer->setBackgroundColor(0, 0, 0);
+		
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud();
 		//viewer->addPointCloud(voxel_centroid_cloud, "voxel centroids");
@@ -627,7 +583,7 @@ class CSCSegmentator : public Segmentator{
 		pcl::PointCloud<pcl::PointNormal>::Ptr sv_normal_cloud = super.makeSupervoxelNormalCloud(supervoxel_clusters);
 		//viewer->addPointCloudNormals<pcl::PointNormal> (sv_normal_cloud, 1, 5.0f, "supervoxel_normals");
 
-		cout << "Getting supervoxel adjacency" << endl;
+		//cout << "Getting supervoxel adjacency" << endl;
 		std::multimap<uint32_t, uint32_t> supervoxel_adjacency;
 		super.getSupervoxelAdjacency(supervoxel_adjacency);
 		
@@ -665,18 +621,16 @@ class CSCSegmentator : public Segmentator{
 
 
 		std::list < std::multimap<uint32_t,uint32_t> > scsc = SSC(supervoxel_adjacency, supervoxel_clusters);
-		cout << "before remapping" << endl;
+		//cout << "before remapping" << endl;
 
 		pcl::PointCloud<pcl::PointXYZL>::iterator pcit;
-		pcl::PointCloud<pcl::PointXYZL>::Ptr coloredCLD (new pcl::PointCloud<pcl::PointXYZL>);
 
 		std::list < std::multimap<uint32_t,uint32_t> >::iterator lmmit;
 		uint32_t labeler = 0;
-		cout << "scsc size: " << scsc.size() << endl;
+		
 		std::multimap<uint32_t,uint32_t>::iterator mmiter;
 		for(lmmit = scsc.begin(); lmmit != scsc.end(); lmmit++){
 			mmiter = (*lmmit).begin();
-			cout << "remapping" << endl;
 			while( mmiter != (*lmmit).end()){
 				for(pcit = labeled_cloud->begin(); pcit != labeled_cloud->end(); pcit++){
 					if(pcit->label == mmiter->first){
@@ -685,7 +639,7 @@ class CSCSegmentator : public Segmentator{
 						clpt.y = pcit->y;
 						clpt.z = pcit->z;
 						clpt.label = labeler;
-						coloredCLD->push_back(clpt);
+						finalCLD.push_back(clpt);
 					}
 				}
 				mmiter = (*lmmit).upper_bound(mmiter->first);
@@ -694,18 +648,39 @@ class CSCSegmentator : public Segmentator{
 			labeler++;
 		}
 
-		cout << "before viewer" << endl;
-		viewer->addPointCloud(coloredCLD, "labeled voxels");
+
+	}
+	void setMinimumInliers(unsigned int ui){
+		minimum_ui = ui;
+	}
+	void saveSegments(std::string fname){
+		pcl::PointCloud<pcl::PointXYZL>::iterator litr;
+		std::map<uint32_t, pcl::PointCloud<pcl::PointXYZL> > mp;
+		for(litr = finalCLD.begin(); litr != finalCLD.end(); litr++){
+			if(mp.find(litr->label) == mp.end()){
+				mp[litr->label] = pcl::PointCloud<pcl::PointXYZL>();
+			}
+			mp[litr->label].push_back(*litr);
+		}
+		std::map<uint32_t, pcl::PointCloud<pcl::PointXYZL> >::iterator mitr;
+		for(mitr = mp.begin(); mitr != mp.end(); mitr++){
+			std::ostringstream ss;
+			ss << mitr->first << fname;
+			pcl::io::savePLYFileBinary(ss.str(), mitr->second);
+		}
+		
+	}
+	void viewSegments(){
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
+		viewer->setBackgroundColor(0, 0, 0);
+		pcl::PointCloud<pcl::PointXYZL>::Ptr pr(&finalCLD);
+		viewer->addPointCloud(pr, "labeled voxels");
 
 		while (!viewer->wasStopped ())
 		{
 		viewer->spinOnce (100);
 		}
 		return;
-
-	}
-	void setMinimumInliers(unsigned int ui){
-		minimum_ui = ui;
 	}
 };
 

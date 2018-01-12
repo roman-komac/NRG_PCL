@@ -69,6 +69,7 @@ int main(int argv, char** argc){
 	//Manj k 100 so posamezne krpe
 	segmentator.setMinimumInliers(100);
 	segmentator.segment(segCloudRGB);
-
+	segmentator.saveSegments("pointcloud_save.ply");
+	segmentator.viewSegments();
 
 }

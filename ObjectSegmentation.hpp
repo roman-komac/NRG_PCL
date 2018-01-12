@@ -13,18 +13,10 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/io/ply_io.h>
 
-/* templated trio (same as std::pair<>) but holds three values */
-template <class c1, class c2, class c3>
-struct trio{
-	c1 first;
-	c2 second;
-	c3 third;
-	trio(c1 fCl, c2 sCl, c3 tCl) : first(fCl), second(sCl), third(tCl) {}
-};
-
 class Segmentator{
 	protected:
 	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pcld;
+	pcl::PointCloud<pcl::PointXYZL>::Ptr final;
 	std::vector<unsigned int> labels;
 	public:
 	void setInputCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr& pcldinput){
@@ -32,6 +24,12 @@ class Segmentator{
 		labels = std::vector<unsigned int>(pcld->size());
 	}
 	void segment(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr& pcldinput){
+
+	}
+	void saveSegments(std::string fname){
+		pcl::io::savePLYFileBinary(fname, *final);
+	}
+	void viewSegments(){
 
 	}
 };
