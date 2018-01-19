@@ -120,9 +120,20 @@ class CSCSegmentator : public Segmentator{
 						break;
 					}
 				}
-				std::pair<int,int> cut = bestCut(SG, es.eigenvectors().block(0, cnt, es.eigenvectors().rows(), std::min(cnt+5, (int)es.eigenvectors().cols() - cnt)), relabelled, relabelledT, edgeWeight);				
+				Eigen::MatrixXd xd = es.eigenvectors().block(0, cnt, es.eigenvectors().rows(), std::min(cnt+5, (int)es.eigenvectors().cols() - cnt));
+				std::pair<int,int> cut = bestCut(SG, xd, relabelled, relabelledT, edgeWeight);		
 
+				std::vector< std::pair<double, double> > data;
 
+				std::vector< std::pair<int,double> > rsrt = argsort(xd, cut.first);
+				for(int f = 0; f < rsrt.size(); f++){
+					data.push_back(std::pair<double, double>(f, rsrt[f].second));
+				}
+				cout << "cut at: " << xd.coeffRef(rsrt[cut.second].first, cut.first) << endl;
+
+				pcl::visualization::PCLPlotter * plotter = new pcl::visualization::PCLPlotter ();
+				plotter->addPlotData(data);
+				plotter->plot();
 
 				//cout << es.eigenvectors().coeffRef(cut.second, cut.first) << " split" << endl;
 
@@ -378,13 +389,13 @@ class CSCSegmentator : public Segmentator{
 					if(convex_edge(pn1, pn2)){
 						edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]) = 1;
 					} else {
+						
 						edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]) = lin_rbf(normal_distance_sqr(pn1, pn2), rbf_param);
 					}
-
 					if(cannot_link(edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]), wtresh)){
-						
 						edgeWeight.coeffRef(lmp[supervoxel_label], lmp[adjacent_itr->second]) = -1;
 					}
+
 			}
 			label_itr = supervoxel_adjacency.upper_bound (supervoxel_label);
 		}
@@ -437,6 +448,12 @@ class CSCSegmentator : public Segmentator{
 		vec[0] = pn1.normal[1] * pn2.normal[2] - pn1.normal[2] * pn2.normal[1];
 		vec[1] = pn1.normal[2] * pn2.normal[0] - pn1.normal[0] * pn2.normal[2];
 		vec[2] = pn1.normal[0] * pn2.normal[1] - pn1.normal[1] * pn2.normal[0];
+	}
+
+	/* produkt vektorjev normal
+	*/
+	double normal_dot(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
+		return pn2.normal[0] * pn1.normal[0] + pn2.normal[1] * pn1.normal[1] + pn2.normal[2] * pn1.normal[2];
 	}
 
 	/* produkt vektorjev normal
@@ -565,7 +582,10 @@ class CSCSegmentator : public Segmentator{
 		cout << "Found " << supervoxel_clusters.size() << " supervoxels" << endl;
 		//super.refineSupervoxels(2, supervoxel_clusters);
 
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
+		viewer->setBackgroundColor(0, 0, 0);
 		
+
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud();
 		//viewer->addPointCloud(voxel_centroid_cloud, "voxel centroids");
@@ -574,6 +594,12 @@ class CSCSegmentator : public Segmentator{
 
 		
 		pcl::PointCloud<pcl::PointXYZL>::Ptr labeled_cloud = super.getLabeledCloud();
+		viewer->addPointCloud(labeled_cloud, "labeled cld");
+		while (!viewer->wasStopped ())
+		{
+		viewer->spinOnce (100);
+		}
+
 		pcl::PointCloud<pcl::PointXYZLNormal>::Ptr nrmlabeled(new pcl::PointCloud<pcl::PointXYZLNormal>);
 		pcl::concatenateFields(*labeled_cloud, *nrms, *nrmlabeled);
 		//viewer->addPointCloud(labeled_cloud, "labeled voxels");
