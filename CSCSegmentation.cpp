@@ -123,7 +123,7 @@ class CSCSegmentator : public Segmentator{
 				Eigen::MatrixXd xd = es.eigenvectors().block(0, cnt, es.eigenvectors().rows(), std::min(cnt+5, (int)es.eigenvectors().cols() - cnt));
 				std::pair<int,int> cut = bestCut(SG, xd, relabelled, relabelledT, edgeWeight);		
 
-				std::vector< std::pair<double, double> > data;
+				/*std::vector< std::pair<double, double> > data;
 
 				std::vector< std::pair<int,double> > rsrt = argsort(xd, cut.first);
 				for(int f = 0; f < rsrt.size(); f++){
@@ -133,7 +133,7 @@ class CSCSegmentator : public Segmentator{
 
 				pcl::visualization::PCLPlotter * plotter = new pcl::visualization::PCLPlotter ();
 				plotter->addPlotData(data);
-				plotter->plot();
+				plotter->plot();*/
 
 				//cout << es.eigenvectors().coeffRef(cut.second, cut.first) << " split" << endl;
 
@@ -582,8 +582,8 @@ class CSCSegmentator : public Segmentator{
 		cout << "Found " << supervoxel_clusters.size() << " supervoxels" << endl;
 		//super.refineSupervoxels(2, supervoxel_clusters);
 
-		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
-		viewer->setBackgroundColor(0, 0, 0);
+		//boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
+		//viewer->setBackgroundColor(0, 0, 0);
 		
 
 
@@ -594,11 +594,11 @@ class CSCSegmentator : public Segmentator{
 
 		
 		pcl::PointCloud<pcl::PointXYZL>::Ptr labeled_cloud = super.getLabeledCloud();
-		viewer->addPointCloud(labeled_cloud, "labeled cld");
-		while (!viewer->wasStopped ())
-		{
-		viewer->spinOnce (100);
-		}
+		//viewer->addPointCloud(labeled_cloud, "labeled cld");
+		//while (!viewer->wasStopped ())
+		//{
+		//viewer->spinOnce (100);
+		//}
 
 		pcl::PointCloud<pcl::PointXYZLNormal>::Ptr nrmlabeled(new pcl::PointCloud<pcl::PointXYZLNormal>);
 		pcl::concatenateFields(*labeled_cloud, *nrms, *nrmlabeled);
