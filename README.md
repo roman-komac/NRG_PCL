@@ -11,9 +11,9 @@ Point cloud segmentation is implemented in C++. It relies on the following llibr
 * CSCSegmentation.cpp - constrained supervoxel clustering method
 
 ## Input
-Executable expects files of type .ply
+Executable expects files of type .ply<br/>
 ./oseg  pathToFile/pointCloud.ply
 
 ## Output
-Executable produces files of type .ply
+Executable produces files of type .ply<br/>
 For each segment a file is produced according to label and saved in current directory.
