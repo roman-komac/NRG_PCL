@@ -123,22 +123,8 @@ class CSCSegmentator : public Segmentator{
 				Eigen::MatrixXd xd = es.eigenvectors().block(0, cnt, es.eigenvectors().rows(), std::min(cnt+5, (int)es.eigenvectors().cols() - cnt));
 				std::pair<int,int> cut = bestCut(SG, xd, relabelled, relabelledT, edgeWeight);		
 
-				/*std::vector< std::pair<double, double> > data;
-
-				std::vector< std::pair<int,double> > rsrt = argsort(xd, cut.first);
-				for(int f = 0; f < rsrt.size(); f++){
-					data.push_back(std::pair<double, double>(f, rsrt[f].second));
-				}
-				cout << "cut at: " << xd.coeffRef(rsrt[cut.second].first, cut.first) << endl;
-
-				pcl::visualization::PCLPlotter * plotter = new pcl::visualization::PCLPlotter ();
-				plotter->addPlotData(data);
-				plotter->plot();*/
-
-				//cout << es.eigenvectors().coeffRef(cut.second, cut.first) << " split" << endl;
-
-				//cout << "cututility: " << CutUtility(SG, cut, relabelled, es.eigenvectors(), edgeWeight) << endl;
 				
+				/* This part needs rework for better efficiency. Does not follow proposed pseudokode */
 				if(CutUtility(SG, cut, relabelled, es.eigenvectors(), edgeWeight) > 0.0){
 					std::pair< std::multimap<uint32_t,uint32_t>, std::multimap<uint32_t,uint32_t> > prCC = cutGraph(SG, cut, es.eigenvectors(), relabelled, relabelledT);
 					if(prCC.first.size() == 0)
@@ -172,6 +158,7 @@ class CSCSegmentator : public Segmentator{
 		return C;
 	}
 
+	/* Bipartition graph using appropriate cut */	
 	std::pair< std::multimap<uint32_t,uint32_t>, std::multimap<uint32_t,uint32_t> > cutGraph(std::multimap<uint32_t,uint32_t>& SG, std::pair<int,int> cut, const Eigen::MatrixXd& eigenvecs, std::map< uint32_t,uint32_t >& relabelled, std::map< uint32_t,uint32_t >& relabelledT){
 		std::multimap<uint32_t,uint32_t> C1;
 		std::multimap<uint32_t,uint32_t> C2;
@@ -205,6 +192,7 @@ class CSCSegmentator : public Segmentator{
 		return std::pair< std::multimap<uint32_t,uint32_t>, std::multimap<uint32_t,uint32_t> >(C1, C2);
 	}
 
+	/* true if value contained in vector<uint32_t> */
 	bool invec(uint32_t val, std::vector<uint32_t>& vec){
 		for(int i = 0; i < vec.size(); i++){
 			if(vec[i] == val)
@@ -213,6 +201,7 @@ class CSCSegmentator : public Segmentator{
 		return false;
 	}
 
+	/* returns the cut score used to determine if cut is appropriate */
 	double CutUtility(std::multimap<uint32_t,uint32_t>& C, std::pair<int,int>& cut, std::map< uint32_t,uint32_t >& relabelled, const Eigen::MatrixXd& eigenvecs, Eigen::SparseMatrix<double>& edgeWeight){
 		std::multimap<uint32_t,uint32_t>::iterator mmit;
 		double totalCL = 0.0;
@@ -228,6 +217,7 @@ class CSCSegmentator : public Segmentator{
 		return totalCL/totalCut;
 	}
 
+	/* Finds best cut */
 	std::pair<int,int> bestCut(std::multimap<uint32_t,uint32_t>& C, const Eigen::MatrixXd& eigenvecs, std::map< uint32_t,uint32_t >& relabelled, std::map< uint32_t,uint32_t >& relabelledT, Eigen::SparseMatrix<double>& edgeWeight){
 		
 		// cuti, cutv, cuts <- 0, 0, 0
@@ -292,6 +282,7 @@ class CSCSegmentator : public Segmentator{
 		return std::pair<int,int>(cuti, rsrt[cutv].first);
 	}
 
+	/* Finds best cut in a signed laplacian matrix */
 	double signedCut(int idx, std::vector< std::pair<int,double> >& srtd, Eigen::SparseMatrix<double>& edgeWeight, std::map< uint32_t,uint32_t >& relabelledT, std::multimap<uint32_t,uint32_t>& C){
 		double scc = 0;
 		for(int h = 0; h <= idx; h++){
@@ -341,10 +332,12 @@ class CSCSegmentator : public Segmentator{
 		}
 	}
 
+	/* true if cannot link constraint holds */
 	bool cannot_link(double ew, double wtr){
 		return ew < wtr;
 	}
 
+	/* relabelling back to correct labels. Needs rework, part of bottleneck */
 	void relabel(std::multimap<uint32_t,uint32_t> graph, std::map< uint32_t,uint32_t >& lmp, std::map< uint32_t,uint32_t >& lmpT){
 		std::multimap<uint32_t,uint32_t>::const_iterator cit;
 		std::map< uint32_t,uint32_t >::iterator mit;
@@ -362,11 +355,13 @@ class CSCSegmentator : public Segmentator{
 
 	}
 
+	/* Calculates weights between all connected nodes */
 	Eigen::SparseMatrix<double> calc_weights(std::multimap<uint32_t,uint32_t> supervoxel_adjacency, std::map<uint32_t, pcl::Supervoxel<pcl::PointXYZRGB>::Ptr > supervoxel_clusters, std::map< uint32_t,uint32_t >& lmp, int sz){
 		Eigen::SparseMatrix<double> edgeWeight(sz, sz);
-		//Povprecna rezervacija prostora
+		
+		/* Reserved for average space consumption */
 		edgeWeight.reserve(4*supervoxel_clusters.size());
-		//Polnjenje matrike povezav grafa
+		
 
 		std::multimap<uint32_t,uint32_t>::iterator label_itr;
 		label_itr = supervoxel_adjacency.begin();
@@ -406,14 +401,14 @@ class CSCSegmentator : public Segmentator{
 
 
 
-	/* sign, vkljucuje relativno napako
+	/* sign, includes delta error
 	*/
 	int scalar_sign(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		float scalar = (pn2.x - pn1.x) * pn2.normal[0] + (pn2.y - pn1.y) * pn2.normal[1] + (pn2.z - pn1.z) * pn2.normal[2];
 		return (scalar < -DELTA_ERROR)? -1 : ((scalar > DELTA_ERROR)? 1 : 0);
 	}
 
-	/* metrika za konveksnost roba
+	/* edge convexity metric
 	*/
 	bool convex_edge(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		return (pn2.x - pn1.x) * (pn2.normal[0] - pn1.normal[0]) + 
@@ -421,19 +416,19 @@ class CSCSegmentator : public Segmentator{
 		       (pn2.z - pn1.z) * (pn2.normal[2] - pn1.normal[2]) > 0;
 	}
 
-	/* evklidska razdalja
+	/* euclidean distance between pcl::PointNormal points
 	*/
 	double euclidean_distance(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		return sqrt((pn2.x-pn1.x)*(pn2.y-pn1.y)*(pn2.z-pn1.z));
 	}
 
-	/* kvadratna evklidska razdalja
+	/* squared euclidean distance between pcl::PointNormal points
 	*/
 	double euclidean_distance_sqr(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		return (pn2.x-pn1.x)*(pn2.y-pn1.y)*(pn2.z-pn1.z);
 	}
 
-	/* kvadratna evklidska razdalja
+	/* squared euclidean distance between pcl::PointNormal normals
 	*/
 	double normal_distance_sqr(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		double f = (pn2.normal[0] - pn1.normal[0]);
@@ -442,7 +437,7 @@ class CSCSegmentator : public Segmentator{
 		return f*f + s*s + t*t;
 	}
 
-	/* krizni produkt normal
+	/* normal cross product for pcl::PointNormal
 	*/
 	void normal_cross_product(pcl::PointNormal& pn1, pcl::PointNormal& pn2, double* vec){
 		vec[0] = pn1.normal[1] * pn2.normal[2] - pn1.normal[2] * pn2.normal[1];
@@ -450,25 +445,25 @@ class CSCSegmentator : public Segmentator{
 		vec[2] = pn1.normal[0] * pn2.normal[1] - pn1.normal[1] * pn2.normal[0];
 	}
 
-	/* produkt vektorjev normal
+	/* normal dot product for pcl::PointNormal
 	*/
 	double normal_dot(pcl::PointNormal& pn1, pcl::PointNormal& pn2){
 		return pn2.normal[0] * pn1.normal[0] + pn2.normal[1] * pn1.normal[1] + pn2.normal[2] * pn1.normal[2];
 	}
 
-	/* produkt vektorjev normal
+	/* normal dot product for pcl::PointXYZ. pcl::PointXYZ is used internally in pcl to represent cluster centroid
 	*/
 	double normal_dot(pcl::PointXYZ& pn1, pcl::PointXYZ& pn2){
 		return pn2.x * pn1.x + pn2.y * pn1.y + pn2.z * pn1.z;
 	}
 
-	/* krizni produkt normal
+	/* angle between normals for pcl::PointXYZ. pcl::PointXYZ is used internally in pcl to represent cluster centroid
 	*/
 	double normal_angle(pcl::PointXYZ& pn1, pcl::PointXYZ& pn2){
 		return acos(normal_dot(pn1, pn2));
 	}
 
-	/* rotiranje tocke za 180°
+	/* rotate normal for 180 degrees
 	*/
 	pcl::PointXYZ& nflip(pcl::PointXYZ& pt){
 		pt.x = -pt.x;
@@ -477,19 +472,19 @@ class CSCSegmentator : public Segmentator{
 		return pt;
 	}
 
-	/* kvadratna inverzna radial basis funkcija
+	/* squared inverse radial basis function
 	*/
 	static double rbf(double c, double par = 1.0){
 		return 1.0 / (1.0 + par*c*c);
 	}
 
-	/* linearna inverzna radial basis funkcija
+	/* inverse radial basis function
 	*/
 	static double lin_rbf(double c, double par = 1.0){
 		return 1.0 / (1.0 + par*c);
 	}
 
-	/* Za izris povezav med supervoksli, izdelava poligonske mreze
+	/* Polygon net drawing
 	*/
 	void polygonize (pcl::PointXYZRGBA &supervoxel_center,
                                   pcl::PointCloud<pcl::PointXYZRGBA> &adjacent_supervoxel_centers,
@@ -516,15 +511,17 @@ class CSCSegmentator : public Segmentator{
 		viewer->addModelFromPolyData (polyData,supervoxel_name);
 	}
 
-	/* Izracun predznacene Laplaceove matrike
+	/* signed graph Laplacian matrix calculation
 	*/
 	void signedLaplacian(Eigen::SparseMatrix<double> A, Eigen::SparseMatrix<double>& L){
-		//construct D matrix
-		//ni vazna cols/rows, ker je kvadratna
+		/* construct D matrix */
+		/* cols/rows orientation does not matter, as it is a square matrix */
 		Eigen::SparseMatrix<double> D(A.rows(), A.cols());
 		for(int i = 0; i < A.cols(); i++){
 			D.coeffRef(i, i) = 0.0;
 		}
+
+		/* construct signed A matrix */
 		for (int k = 0; k < A.outerSize(); ++k){
 			for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it){
 				D.coeffRef(it.col(), it.col()) += abs(it.value());
@@ -534,13 +531,17 @@ class CSCSegmentator : public Segmentator{
 		L = D - A;
 	}
 
+	/* graph Laplacian matrix calculation
+	*/
 	void Laplacian(Eigen::SparseMatrix<double> A, Eigen::SparseMatrix<double>& L){
-		//construct D matrix
-		//ni vazna cols/rows, ker je kvadratna
+		/* construct D matrix */
+		/* cols/rows orientation does not matter, as it is a square matrix */
 		Eigen::SparseMatrix<double> D(A.rows(), A.cols());
 		for(int i = 0; i < A.cols(); i++){
 			D.coeffRef(i, i) = 0.0;
 		}
+
+		/* construct A matrix */
 		for (int k = 0; k < A.outerSize(); ++k){
 			for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it){
 				D.coeffRef(it.col(), it.col()) += it.value();
@@ -550,16 +551,17 @@ class CSCSegmentator : public Segmentator{
 		L = D - A;
 	}
 
+
 	void segment(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr& pcldinput){
 		unsigned int cntr = 0;
 
-		//supervokselizacija
+		/* supervoxelization */
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr subCloudRGB (new pcl::PointCloud<pcl::PointXYZRGB>);
 		pcl::PointCloud<pcl::Normal>::Ptr nrms (new pcl::PointCloud<pcl::Normal>);
 		copyPointCloud(*pcld, *subCloudRGB);
 		copyPointCloud(*pcld, *nrms);
 
-		//supervokeslizacijski parametri
+		/* supervoxelization parameters */
 		float voxel_resolution = 2.0f;
 		float seed_resolution = 64.0f;
 		float color_importance = 0.2f;
@@ -568,7 +570,7 @@ class CSCSegmentator : public Segmentator{
 
 		pcl::SupervoxelClustering<pcl::PointXYZRGB> super (voxel_resolution, seed_resolution);
 		
-		//False ce point cloud ne vsebuje podatka o globini(npr. zajem s Kinectom)
+		/* false if no depth data is available(e.g. Kinect captured point cloud data) */
 		super.setUseSingleCameraTransform(false);
 		super.setInputCloud(subCloudRGB);
 		super.setNormalCloud(nrms);
@@ -580,6 +582,7 @@ class CSCSegmentator : public Segmentator{
 
 		super.extract(supervoxel_clusters);
 		cout << "Found " << supervoxel_clusters.size() << " supervoxels" << endl;
+		/* supervoxel refining, better centroid/normal approximation */
 		//super.refineSupervoxels(2, supervoxel_clusters);
 
 		//boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
@@ -613,12 +616,11 @@ class CSCSegmentator : public Segmentator{
 		std::multimap<uint32_t, uint32_t> supervoxel_adjacency;
 		super.getSupervoxelAdjacency(supervoxel_adjacency);
 		
-		//Graf konveksnosti
+		/* convexity graph */
 		std::map<uint32_t, bool> convexity;
-		
 
 
-		//Polnjenje grafa konveksnosti
+		/* convexity graph filling */
 		std::multimap<uint32_t,uint32_t>::iterator label_itr = supervoxel_adjacency.begin();
 		
 		while (label_itr != supervoxel_adjacency.end())
@@ -641,13 +643,10 @@ class CSCSegmentator : public Segmentator{
 			convexity.insert(std::pair<uint32_t, bool>(supervoxel_label, connects > 0));
 			label_itr = supervoxel_adjacency.upper_bound (supervoxel_label);
 		}
-		//velikost = last index+1
+		/* size = last index+1 */
 		uint32_t maxlabel = super.getMaxLabel()+1;
 
-
-
 		std::list < std::multimap<uint32_t,uint32_t> > scsc = SSC(supervoxel_adjacency, supervoxel_clusters);
-		//cout << "before remapping" << endl;
 
 		pcl::PointCloud<pcl::PointXYZL>::iterator pcit;
 
@@ -676,9 +675,13 @@ class CSCSegmentator : public Segmentator{
 
 
 	}
+
+
 	void setMinimumInliers(unsigned int ui){
 		minimum_ui = ui;
 	}
+
+	/* save segments to file */
 	void saveSegments(std::string fname){
 		pcl::PointCloud<pcl::PointXYZL>::iterator litr;
 		std::map<uint32_t, pcl::PointCloud<pcl::PointXYZL> > mp;
@@ -696,6 +699,8 @@ class CSCSegmentator : public Segmentator{
 		}
 		
 	}
+
+	/* view segments with PCLVisualizer */
 	void viewSegments(){
 		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
 		viewer->setBackgroundColor(0, 0, 0);
